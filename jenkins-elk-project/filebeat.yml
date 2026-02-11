@@ -10,4 +10,3 @@ processors:
 
 output.elasticsearch:
   hosts: ["http://elasticsearch:9200"]
-  index: "jenkins-logs-%{+yyyy.MM.dd}"
