@@ -1,8 +1,8 @@
-filebeat.inputs:
-  - type: container
-    enabled: true
-    paths:
-      - /var/lib/docker/containers/*/*.log
+filebeat.autodiscover:
+  providers:
+    - type: docker
+      hints.enabled: true
+      host: "unix:///var/run/docker.sock"
 
 processors:
   - add_docker_metadata:
