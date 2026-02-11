@@ -1,0 +1,72 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  # Configuration pour lire les logs STDOUT des conteneurs Docker
+  - job_name: docker
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+    
+    relabel_configs:
+      # Garder uniquement le conteneur Jenkins
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/jenkins'
+        action: keep
+      
+      # Ajouter le nom du conteneur comme label
+      - source_labels: ['__meta_docker_container_name']
+        target_label: 'container_name'
+        regex: '/(.*)'
+        replacement: '$1'
+      
+      # Ajouter l'ID du conteneur
+      - source_labels: ['__meta_docker_container_id']
+        target_label: 'container_id'
+      
+      # Ajouter l'image Docker
+      - source_labels: ['__meta_docker_container_image']
+        target_label: 'image'
+      
+      # Ajouter les labels Docker
+      - source_labels: ['__meta_docker_container_label_com_docker_compose_service']
+        target_label: 'service'
+    
+    pipeline_stages:
+      # Parser le format JSON des logs Docker
+      - json:
+          expressions:
+            log: log
+            stream: stream
+            time: time
+      
+      # Parser le timestamp
+      - timestamp:
+          source: time
+          format: RFC3339Nano
+      
+      # Extraire le niveau de log Jenkins si présent
+      - regex:
+          expression: '^(?P<timestamp>\S+)\s+(?P<level>(FINEST|FINER|FINE|CONFIG|INFO|WARNING|SEVERE))\s+(?P<logger>\S+)\s+(?P<message>.*)$'
+      
+      # Ajouter le niveau comme label
+      - labels:
+          level:
+          logger:
+      
+      # Remplacer le contenu avec le message parsé
+      - output:
+          source: message
+      
+      # Ajouter des métadonnées du projet
+      - static_labels:
+          project: jenkins-security-dataset
+          phase: log-collection
+          source: docker-stdout
