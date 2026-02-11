@@ -1,12 +1,17 @@
-filebeat.autodiscover:
-  providers:
-    - type: docker
-      hints.enabled: true
-      host: "unix:///var/run/docker.sock"
+filebeat.inputs:
+  - type: container
+    enabled: true
+    paths:
+      - /var/lib/docker/containers/*/*.log
+    processors:
+      - add_docker_metadata:
+          host: "unix:///var/run/docker.sock"
 
-processors:
-  - add_docker_metadata:
-      host: "unix:///var/run/docker.sock"
+      - drop_event:
+          when:
+            not:
+              contains:
+                container.name: "jenkins"
 
 output.elasticsearch:
   hosts: ["http://elasticsearch:9200"]
