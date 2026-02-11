@@ -213,7 +213,7 @@ class DatasetCollector:
             self.log(f"✗ Erreur génération statistiques: {e}")
             return None
     
-    def collect_full_dataset(self, normal_duration=3600, normal_users=10, use_loki=True):
+    def collect_full_dataset(self, normal_duration=3600, normal_users=10):
         """Collecte complète du dataset"""
         self.log("=" * 80)
         self.log("DÉBUT DE LA COLLECTE DU DATASET JENKINS")
@@ -243,13 +243,7 @@ class DatasetCollector:
         time.sleep(120)
         
         # 4. Export des logs
-        if use_loki:
-            raw_logs = self.export_logs_from_loki(
-                start_collection.isoformat() + 'Z',
-                attack_end.isoformat() + 'Z'
-            )
-        else:
-            raw_logs = self.export_logs_from_elasticsearch()
+        raw_logs = self.export_logs_from_elasticsearch()
         
         if not raw_logs:
             self.log("✗ Erreur: Impossible d'exporter les logs")
@@ -287,8 +281,8 @@ def main():
                         help='Durée du trafic normal en secondes (défaut: 1h)')
     parser.add_argument('--normal-users', type=int, default=10,
                         help='Nombre d\'utilisateurs simultanés pour le trafic normal')
-    parser.add_argument('--backend', choices=['loki', 'elasticsearch'], default='loki',
-                        help='Backend de logs à utiliser')
+    parser.add_argument('--backend', choices=['elasticsearch'], default='elasticsearch',
+                        help='Backend de logs à utiliser (Elasticsearch/Kibana)')
     
     args = parser.parse_args()
     
@@ -296,8 +290,7 @@ def main():
     
     success = collector.collect_full_dataset(
         normal_duration=args.normal_duration,
-        normal_users=args.normal_users,
-        use_loki=(args.backend == 'loki')
+        normal_users=args.normal_users
     )
     
     exit(0 if success else 1)

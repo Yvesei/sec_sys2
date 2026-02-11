@@ -1,0 +1,75 @@
+filebeat.inputs:
+  # Collecte des logs depuis les conteneurs Docker via STDOUT
+  - type: container
+    enabled: true
+    paths:
+      - '/var/lib/docker/containers/*/*.log'
+    
+    # Filtrer uniquement le conteneur Jenkins
+    containers.ids:
+      - '*'
+    
+    # Parser les logs JSON de Docker
+    json.keys_under_root: true
+    json.add_error_key: true
+    json.message_key: log
+    
+    # Ajouter des métadonnées Docker
+    processors:
+      - add_docker_metadata:
+          host: "unix:///var/run/docker.sock"
+          match_source: true
+          match_source_index: 4
+      
+      # Filtrer pour ne garder que Jenkins
+      - drop_event:
+          when:
+            not:
+              equals:
+                container.name: "jenkins"
+      
+      # Ajouter des champs personnalisés
+      - add_fields:
+          target: project
+          fields:
+            name: "jenkins-security-dataset"
+            phase: "log-collection"
+      
+      # Extraire le timestamp
+      - timestamp:
+          field: time
+          layouts:
+            - '2006-01-02T15:04:05.999999999Z'
+          test:
+            - '2023-01-02T15:04:05.123456789Z'
+
+# Configuration de sortie vers Elasticsearch
+output.elasticsearch:
+  hosts: ["elasticsearch:9200"]
+  index: "jenkins-logs-%{+yyyy.MM.dd}"
+  
+  # Configuration des pipelines d'ingestion
+  pipeline: "jenkins-log-pipeline"
+
+# Configuration des index templates
+setup.template.name: "jenkins-logs"
+setup.template.pattern: "jenkins-logs-*"
+setup.template.settings:
+  index.number_of_shards: 1
+  index.number_of_replicas: 0
+
+# Configuration Kibana
+setup.kibana:
+  host: "kibana:5601"
+
+# Niveau de logging de Filebeat
+logging.level: info
+logging.to_files: true
+logging.files:
+  path: /var/log/filebeat
+  name: filebeat
+  keepfiles: 7
+  permissions: 0644
+
+# Monitoring
+monitoring.enabled: false
